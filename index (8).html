@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1B9E4B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Micro Gains</title>
+<style>
+  :root { --vert:#1B9E4B; --vert-fonce:#14793a; --fond:#f2f5f3; --texte:#17231c; --gris:#6b7a72; --rouge:#c62828; --or:#f5b301; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; }
+  body { font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--fond); color:var(--texte); font-size:17px; }
+  header { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:8px; background:var(--vert); color:#fff;
+           padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px; min-height:58px; }
+  header h1 { flex:1; margin:0; font-size:19px; font-weight:700; text-align:center; }
+  .ibtn { width:42px; height:42px; border:0; border-radius:50%; background:rgba(255,255,255,.18); color:#fff; font-size:22px; line-height:1; cursor:pointer; }
+  .ibtn.cache { visibility:hidden; }
+  main { padding:16px; padding-bottom:calc(24px + env(safe-area-inset-bottom,0px)); max-width:520px; margin:0 auto; }
+  .ecran { display:none; }
+  .ecran.actif { display:block; }
+  .carte-solde { background:linear-gradient(135deg,var(--vert),var(--vert-fonce)); color:#fff; border-radius:20px; padding:24px; text-align:center; margin-bottom:18px; box-shadow:0 6px 16px rgba(27,158,75,.3); }
+  .carte-solde small { opacity:.85; font-size:15px; }
+  .carte-solde .montant { font-size:42px; font-weight:800; margin:6px 0; }
+  .btn { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; min-height:56px; border:0; border-radius:14px; font-size:18px; font-weight:700; cursor:pointer; margin-bottom:12px; }
+  .btn.plein { background:var(--vert); color:#fff; }
+  .btn.contour { background:#fff; color:var(--vert-fonce); border:2px solid var(--vert); }
+  .btn.or { background:var(--or); color:#3a2c00; }
+  .btn:disabled { opacity:.55; }
+  label { display:block; font-weight:600; margin:14px 0 6px; }
+  input { width:100%; min-height:52px; border:2px solid #cfd8d3; border-radius:12px; padding:0 14px; font-size:18px; background:#fff; }
+  input:focus { outline:none; border-color:var(--vert); }
+  .aide { color:var(--gris); font-size:14px; margin-top:6px; }
+  .choix { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .choix button { min-height:60px; border:2px solid #cfd8d3; background:#fff; border-radius:12px; font-size:17px; font-weight:700; cursor:pointer; }
+  .choix button.sel { border-color:var(--vert); background:#e7f6ec; color:var(--vert-fonce); }
+  .liste { background:#fff; border-radius:14px; padding:4px 14px; }
+  .ligne { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #edf1ee; }
+  .ligne:last-child { border-bottom:0; }
+  .ligne small { color:var(--gris); display:block; }
+  .plus { color:var(--vert-fonce); font-weight:700; }
+  .moins { color:var(--rouge); font-weight:700; }
+  .code { background:#fff; border:2px dashed var(--vert); border-radius:12px; text-align:center; padding:12px; font-size:24px; font-weight:800; letter-spacing:3px; margin-bottom:12px; }
+  .titre { font-size:15px; color:var(--gris); font-weight:700; margin:18px 0 8px; text-transform:uppercase; }
+  .centre { text-align:center; }
+  .lien { background:none; border:0; color:var(--vert-fonce); font-size:16px; font-weight:600; padding:12px; width:100%; cursor:pointer; }
+  #cadre { width:100%; height:calc(100vh - 150px); border:0; background:#fff; border-radius:12px; }
+  #chargement { position:fixed; inset:0; z-index:20; background:rgba(255,255,255,.92); display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px; }
+  #chargement.actif { display:flex; }
+  .rond { width:46px; height:46px; border:5px solid #cfe9d9; border-top-color:var(--vert); border-radius:50%; animation:tour 0.9s linear infinite; margin-bottom:16px; }
+  @keyframes tour { to { transform:rotate(360deg); } }
+  #toast { position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); background:#17231c; color:#fff; padding:14px 18px; border-radius:12px; max-width:90%; text-align:center; z-index:30; display:none; font-size:16px; }
+  #toast.erreur { background:var(--rouge); }
+</style>
+</head>
+<body>
+
+<header>
+  <button class="ibtn cache" id="btnRetour" aria-label="Retour">←</button>
+  <h1 id="titre">Micro Gains</h1>
+  <button class="ibtn cache" id="btnPartage" aria-label="Partager">⇪</button>
+</header>
+
+<main>
+
+  <!-- CONNEXION / INSCRIPTION -->
+  <section class="ecran" id="ecran-login">
+    <div class="centre" style="margin:10px 0 6px;font-size:56px">💰</div>
+    <p class="centre" style="margin-top:0;color:var(--gris)">Gagnez de l’argent avec votre téléphone</p>
+
+    <div id="champNom"><label for="nom">Votre nom</label><input id="nom" autocomplete="name"></div>
+    <label for="tel">Numéro de téléphone</label>
+    <input id="tel" type="tel" inputmode="tel" placeholder="Ex : 077 12 34 56" autocomplete="tel">
+    <div class="aide">Numéro Airtel ou Moov Money du Gabon.</div>
+    <label for="mdp">Mot de passe</label>
+    <input id="mdp" type="password" placeholder="6 caractères minimum" autocomplete="current-password">
+    <div id="champParrain"><label for="parrain">Code parrain (facultatif)</label><input id="parrain" autocapitalize="characters"></div>
+
+    <button class="btn plein" id="btnValider" style="margin-top:22px">Se connecter</button>
+    <button class="lien" id="btnBascule">Pas de compte ? Créer mon compte</button>
+    <button class="btn contour" id="btnInstaller" style="display:none">📲 Installer l’application</button>
+  </section>
+
+  <!-- ACCUEIL -->
+  <section class="ecran" id="ecran-home">
+    <p style="margin:0 0 12px">Bonjour <b id="bonjour"></b> 👋</p>
+    <div class="carte-solde">
+      <small>Mon solde</small>
+      <div class="montant"><span id="solde">0</span> FCFA</div>
+      <small>Retrait possible dès <span id="minRetrait">1000</span> FCFA</small>
+    </div>
+    <button class="btn plein" id="btnOffres">▶ Gagner de l’argent</button>
+    <button class="btn contour" id="btnRetrait">💸 Retirer mon argent</button>
+    <button class="btn or" id="btnParrainer">👥 Inviter un ami</button>
+
+    <div class="titre">Mon code parrain</div>
+    <div class="code" id="codeParrain">------</div>
+
+    <div class="titre">Mon historique</div>
+    <div class="liste" id="historique"><div class="ligne"><span>Chargement…</span></div></div>
+    <button class="lien" id="btnDeco">Se déconnecter</button>
+  </section>
+
+  <!-- OFFRES -->
+  <section class="ecran" id="ecran-offres">
+    <div id="offresMsg" class="centre" style="display:none;padding:30px 10px"></div>
+    <iframe id="cadre" title="Offres" allow="autoplay; fullscreen"></iframe>
+    <button class="lien" id="btnNouvellePage" style="display:none">Ouvrir dans une nouvelle page</button>
+  </section>
+
+  <!-- RETRAIT -->
+  <section class="ecran" id="ecran-retrait">
+    <div class="carte-solde" style="padding:16px">
+      <small>Solde disponible</small>
+      <div class="montant" style="font-size:34px"><span id="soldeRetrait">0</span> FCFA</div>
+    </div>
+    <label>Mon opérateur</label>
+    <div class="choix" id="operateurs">
+      <button data-op="airtel" class="sel">Airtel Money</button>
+      <button data-op="moov">Moov Money</button>
+    </div>
+    <label for="telRetrait">Numéro Mobile Money</label>
+    <input id="telRetrait" type="tel" inputmode="tel" placeholder="Ex : 077 12 34 56">
+    <label for="montant">Montant en FCFA</label>
+    <input id="montant" type="number" inputmode="numeric" placeholder="Ex : 1000">
+    <div class="aide">Minimum : <span id="minRetrait2">1000</span> FCFA</div>
+    <button class="btn plein" id="btnEnvoyer" style="margin-top:22px">Envoyer ma demande</button>
+  </section>
+
+</main>
+
+<div id="chargement"><div class="rond"></div><b id="chargementTexte">Chargement…</b><small id="chargementSous" style="color:#6b7a72;margin-top:8px"></small></div>
+<div id="toast"></div>
+
+<script>
+// ============================================================
+//  MICRO GAINS — application web installable
+// ============================================================
+const API = 'https://micro-gains-api.onrender.com';   // adresse de votre serveur
+
+const $ = (s) => document.querySelector(s);
+const nf = (n) => Number(n || 0).toLocaleString('fr-FR');
+
+// ---------- Stockage ----------
+function lire(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function ecrire(k, v) { try { localStorage.setItem(k, v); } catch {} }
+function effacer(k) { try { localStorage.removeItem(k); } catch {} }
+
+// Identifiant de cet appareil (1 appareil = 1 compte)
+function deviceId() {
+  let d = lire('mg_device');
+  if (!d) {
+    d = 'w-' + (window.crypto && crypto.randomUUID ? crypto.randomUUID()
+        : Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
+    ecrire('mg_device', d);
+  }
+  return d;
+}
+
+// ---------- Messages ----------
+let toastTimer;
+function toast(msg, erreur) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = erreur ? 'erreur' : '';
+  t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.style.display = 'none'), 4500);
+}
+function chargement(on, texte, sous) {
+  $('#chargement').classList.toggle('actif', !!on);
+  $('#chargementTexte').textContent = texte || 'Chargement…';
+  $('#chargementSous').textContent = sous || '';
+}
+
+// ---------- Appel au serveur ----------
+async function appel(chemin, methode = 'GET', corps = null, avecJeton = true) {
+  const headers = { 'Content-Type': 'application/json', 'x-device-id': deviceId() };
+  const jeton = lire('mg_token');
+  if (avecJeton && jeton) headers.Authorization = 'Bearer ' + jeton;
+
+  const ctrl = new AbortController();
+  const stop = setTimeout(() => ctrl.abort(), 70000); // le serveur gratuit peut mettre 1 min à se réveiller
+  let rep;
+  try {
+    rep = await fetch(API + chemin, {
+      method: methode, headers, signal: ctrl.signal,
+      body: corps ? JSON.stringify(corps) : undefined,
+    });
+  } catch {
+    throw new Error('Connexion impossible. Vérifiez votre internet et réessayez.');
+  } finally { clearTimeout(stop); }
+
+  let data = {};
+  try { data = await rep.json(); } catch {}
+  if (rep.status === 401 && avecJeton) { deconnecter(true); throw new Error('Session expirée. Reconnectez-vous.'); }
+  if (!rep.ok) throw new Error(data.error || 'Erreur ' + rep.status);
+  return data;
+}
+
+// ---------- Numéros de téléphone (Gabon par défaut, indicatif 241) ----------
+function normaliserTel(brut) {
+  const s = String(brut || '').trim();
+  let c = s.replace(/\D/g, '');
+  if (s.startsWith('+') || s.startsWith('00')) return c.replace(/^00/, '');
+  if (c.startsWith('241') && c.length >= 11) return c;
+  return '241' + c.replace(/^0+/, '');
+}
+
+// ---------- Navigation ----------
+const TITRES = { login: 'Micro Gains', home: 'Micro Gains', offres: 'Gagner de l’argent', retrait: 'Retirer mon argent' };
+function montrer(nom) {
+  document.querySelectorAll('.ecran').forEach((e) => e.classList.remove('actif'));
+  $('#ecran-' + nom).classList.add('actif');
+  $('#titre').textContent = TITRES[nom];
+  $('#btnRetour').classList.toggle('cache', nom === 'home' || nom === 'login');
+  $('#btnPartage').classList.toggle('cache', nom !== 'home');
+  window.scrollTo(0, 0);
+}
+function aller(nom) { history.pushState({ nom }, ''); montrer(nom); if (nom === 'offres') chargerOffres(); if (nom === 'retrait') preparerRetrait(); }
+window.addEventListener('popstate', (e) => {
+  const nom = (e.state && e.state.nom) || (lire('mg_token') ? 'home' : 'login');
+  montrer(nom);
+  if (nom === 'home') chargerAccueil();
+  if (nom !== 'offres') $('#cadre').src = 'about:blank';
+});
+$('#btnRetour').onclick = () => history.back();
+
+// ---------- Connexion / inscription ----------
+let modeInscription = false;
+function majMode() {
+  $('#champNom').style.display = modeInscription ? 'block' : 'none';
+  $('#champParrain').style.display = modeInscription ? 'block' : 'none';
+  $('#btnValider').textContent = modeInscription ? 'Créer mon compte' : 'Se connecter';
+  $('#btnBascule').textContent = modeInscription ? 'J’ai déjà un compte' : 'Pas de compte ? Créer mon compte';
+}
+$('#btnBascule').onclick = () => { modeInscription = !modeInscription; majMode(); };
+
+$('#btnValider').onclick = async () => {
+  const tel = normaliserTel($('#tel').value);
+  const mdp = $('#mdp').value;
+  if (tel.length < 9) return toast('Entrez votre numéro de téléphone.', true);
+  if (mdp.length < 6) return toast('Le mot de passe doit avoir 6 caractères minimum.', true);
+  try {
+    chargement(true, 'Connexion au serveur…', 'La première fois, cela peut prendre jusqu’à 1 minute.');
+    let rep;
+    if (modeInscription) {
+      const nom = $('#nom').value.trim();
+      if (nom.length < 2) { chargement(false); return toast('Entrez votre nom.', true); }
+      rep = await appel('/auth/register', 'POST',
+        { name: nom, phone: tel, password: mdp, referral_code: $('#parrain').value.trim() }, false);
+    } else {
+      rep = await appel('/auth/login', 'POST', { phone: tel, password: mdp }, false);
+    }
+    ecrire('mg_token', rep.token);
+    chargement(false);
+    history.replaceState({ nom: 'home' }, '');
+    montrer('home');
+    chargerAccueil();
+  } catch (e) { chargement(false); toast(e.message, true); }
+};
+
+function deconnecter(silencieux) {
+  effacer('mg_token');
+  $('#mdp').value = '';
+  history.replaceState({ nom: 'login' }, '');
+  montrer('login');
+  if (!silencieux) toast('Vous êtes déconnecté.');
+}
+$('#btnDeco').onclick = () => deconnecter(false);
+
+// ---------- Accueil ----------
+let profil = null;
+async function chargerAccueil() {
+  try {
+    profil = await appel('/api/me');
+    $('#bonjour').textContent = profil.name;
+    $('#solde').textContent = nf(Math.floor(Number(profil.balance_local_currency)));
+    $('#minRetrait').textContent = nf(profil.min_payout);
+    $('#codeParrain').textContent = profil.referral_code;
+    chargerHistorique();
+  } catch (e) { toast(e.message, true); }
+}
+
+const ETATS = { pending: 'En attente', processing: 'En cours', paid: 'Payé', failed: 'Échoué (remboursé)' };
+async function chargerHistorique() {
+  const box = $('#historique');
+  try {
+    const h = await appel('/api/history');
+    const lignes = [
+      ...h.earnings.map((g) => ({ d: g.created_at, t: 'Gain offre', m: '+' + nf(g.amount_local) + ' FCFA', c: 'plus' })),
+      ...h.payouts.map((p) => ({ d: p.created_at, t: 'Retrait ' + p.operator + ' · ' + (ETATS[p.status] || p.status), m: '−' + nf(p.amount) + ' FCFA', c: 'moins' })),
+    ].sort((a, b) => new Date(b.d) - new Date(a.d)).slice(0, 20);
+    box.innerHTML = '';
+    if (!lignes.length) { box.innerHTML = '<div class="ligne"><span>Aucun mouvement pour le moment.</span></div>'; return; }
+    lignes.forEach((l) => {
+      const div = document.createElement('div'); div.className = 'ligne';
+      const g = document.createElement('span');
+      const t = document.createElement('b'); t.textContent = l.t;
+      const s = document.createElement('small'); s.textContent = new Date(l.d).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+      g.append(t, s);
+      const m = document.createElement('span'); m.className = l.c; m.textContent = l.m;
+      div.append(g, m); box.append(div);
+    });
+  } catch { box.innerHTML = '<div class="ligne"><span>Historique indisponible.</span></div>'; }
+}
+
+$('#btnOffres').onclick = () => aller('offres');
+$('#btnRetrait').onclick = () => aller('retrait');
+
+// ---------- Offres ----------
+let urlOffres = null;
+async function chargerOffres() {
+  const msg = $('#offresMsg'), cadre = $('#cadre'), bouton = $('#btnNouvellePage');
+  msg.style.display = 'none'; cadre.style.display = 'block'; bouton.style.display = 'none';
+  try {
+    chargement(true, 'Chargement des offres…');
+    const r = await appel('/api/offerwall-url');
+    urlOffres = r.url;
+    cadre.src = urlOffres;
+    bouton.style.display = 'block';
+    chargement(false);
+  } catch (e) {
+    chargement(false);
+    cadre.style.display = 'none';
+    msg.style.display = 'block';
+    msg.textContent = e.message;
+  }
+}
+$('#btnNouvellePage').onclick = () => { if (urlOffres) window.open(urlOffres, '_blank'); };
+
+// ---------- Retrait ----------
+let operateur = 'airtel';
+document.querySelectorAll('#operateurs button').forEach((b) => {
+  b.onclick = () => {
+    operateur = b.dataset.op;
+    document.querySelectorAll('#operateurs button').forEach((x) => x.classList.toggle('sel', x === b));
+  };
+});
+function preparerRetrait() {
+  if (!profil) return;
+  $('#soldeRetrait').textContent = nf(Math.floor(Number(profil.balance_local_currency)));
+  $('#minRetrait2').textContent = nf(profil.min_payout);
+  if (!$('#telRetrait').value) $('#telRetrait').value = '0' + String(profil.phone).replace(/^241/, '');
+}
+$('#btnEnvoyer').onclick = async () => {
+  const montant = parseInt($('#montant').value, 10);
+  const tel = normaliserTel($('#telRetrait').value);
+  if (!montant || montant < profil.min_payout) return toast('Montant minimum : ' + nf(profil.min_payout) + ' FCFA.', true);
+  if (montant > Math.floor(Number(profil.balance_local_currency))) return toast('Solde insuffisant.', true);
+  if (tel.length < 11) return toast('Numéro Mobile Money invalide.', true);
+  if (!confirm('Retirer ' + nf(montant) + ' FCFA vers le ' + tel + ' (' + (operateur === 'airtel' ? 'Airtel' : 'Moov') + ') ?')) return;
+  try {
+    chargement(true, 'Envoi de votre demande…');
+    const r = await appel('/api/payout', 'POST', { operator: operateur, phone_number: tel, amount: montant });
+    chargement(false);
+    toast(r.message || 'Demande envoyée.');
+    $('#montant').value = '';
+    history.back();
+  } catch (e) { chargement(false); toast(e.message, true); }
+};
+
+// ---------- Parrainage / partage ----------
+async function partager() {
+  if (!profil) return;
+  const lien = location.origin + '/?ref=' + profil.referral_code;
+  const texte = 'Gagne de l’argent avec ton téléphone ! Inscris-toi avec mon code ' + profil.referral_code + ' 💰 ' + lien;
+  if (navigator.share) { try { await navigator.share({ title: 'Micro Gains', text: texte }); } catch {} }
+  else { try { await navigator.clipboard.writeText(texte); toast('Message copié. Collez-le dans WhatsApp.'); } catch { toast(texte); } }
+}
+$('#btnParrainer').onclick = partager;
+$('#btnPartage').onclick = partager;
+$('#codeParrain').onclick = async () => {
+  if (!profil) return;
+  try { await navigator.clipboard.writeText(profil.referral_code); toast('Code copié.'); } catch {}
+};
+
+// ---------- Installation sur l'écran d'accueil ----------
+let invite = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); invite = e; $('#btnInstaller').style.display = 'flex'; });
+$('#btnInstaller').onclick = async () => {
+  if (!invite) return;
+  invite.prompt(); await invite.userChoice; invite = null; $('#btnInstaller').style.display = 'none';
+};
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// ---------- Démarrage ----------
+(function demarrer() {
+  const ref = new URLSearchParams(location.search).get('ref');
+  if (ref) { $('#parrain').value = ref.toUpperCase(); modeInscription = true; }
+  majMode();
+  if (lire('mg_token')) {
+    history.replaceState({ nom: 'home' }, '');
+    montrer('home');
+    chargerAccueil();
+  } else {
+    history.replaceState({ nom: 'login' }, '');
+    montrer('login');
+    fetch(API + '/').catch(() => {}); // réveille le serveur en arrière-plan
+  }
+})();
+</script>
+</body>
+</html>
