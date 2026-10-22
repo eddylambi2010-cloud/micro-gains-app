@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Micro Gains</title>
 <style>
-  :root { --vert:#1B9E4B; --vert-fonce:#14793a; --fond:#f2f5f3; --texte:#17231c; --gris:#6b7a72; --rouge:#c62828; --or:#f5b301; }
+  :root { --vert:#1B9E4B; --vert-fonce:#14793a; --fond:#f2f5f3; --texte:#17231c; --gris:#6b7a72; --rouge:#c62828; --or:#f5b301; --orange:#b26a00; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { margin:0; height:100%; }
   body { font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--fond); color:var(--texte); font-size:17px; }
@@ -26,6 +26,7 @@
   .carte-solde { background:linear-gradient(135deg,var(--vert),var(--vert-fonce)); color:#fff; border-radius:20px; padding:24px; text-align:center; margin-bottom:18px; box-shadow:0 6px 16px rgba(27,158,75,.3); }
   .carte-solde small { opacity:.85; font-size:15px; }
   .carte-solde .montant { font-size:42px; font-weight:800; margin:6px 0; }
+  .attente { margin-top:12px; background:rgba(255,255,255,.18); border-radius:10px; padding:8px 10px; font-size:15px; display:none; }
   .btn { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; min-height:56px; border:0; border-radius:14px; font-size:18px; font-weight:700; cursor:pointer; margin-bottom:12px; }
   .btn.plein { background:var(--vert); color:#fff; }
   .btn.contour { background:#fff; color:var(--vert-fonce); border:2px solid var(--vert); }
@@ -44,11 +45,14 @@
   .ligne small { color:var(--gris); display:block; }
   .plus { color:var(--vert-fonce); font-weight:700; }
   .moins { color:var(--rouge); font-weight:700; }
+  .orange { color:var(--orange); font-weight:700; }
+  .gris { color:var(--gris); text-decoration:line-through; }
   .code { background:#fff; border:2px dashed var(--vert); border-radius:12px; text-align:center; padding:12px; font-size:24px; font-weight:800; letter-spacing:3px; margin-bottom:12px; }
   .titre { font-size:15px; color:var(--gris); font-weight:700; margin:18px 0 8px; text-transform:uppercase; }
   .centre { text-align:center; }
   .lien { background:none; border:0; color:var(--vert-fonce); font-size:16px; font-weight:600; padding:12px; width:100%; cursor:pointer; }
   #cadre { width:100%; height:calc(100vh - 150px); border:0; background:#fff; border-radius:12px; }
+  #offresReseaux { margin-bottom:12px; }
   #chargement { position:fixed; inset:0; z-index:20; background:rgba(255,255,255,.92); display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px; }
   #chargement.actif { display:flex; }
   .rond { width:46px; height:46px; border:5px solid #cfe9d9; border-top-color:var(--vert); border-radius:50%; animation:tour 0.9s linear infinite; margin-bottom:16px; }
@@ -89,10 +93,12 @@
   <section class="ecran" id="ecran-home">
     <p style="margin:0 0 12px">Bonjour <b id="bonjour"></b> 👋</p>
     <div class="carte-solde">
-      <small>Mon solde</small>
+      <small>Mon solde disponible</small>
       <div class="montant"><span id="solde">0</span> FCFA</div>
-      <small>Retrait possible dès <span id="minRetrait">1000</span> FCFA</small>
+      <small>Retrait possible dès <span id="minRetrait">5000</span> FCFA</small>
+      <div class="attente" id="blocAttente">⏳ En attente de validation : <b><span id="soldeAttente">0</span> FCFA</b></div>
     </div>
+    <div class="aide" style="margin:-6px 0 16px">Tes gains sont validés puis débloqués une fois par mois. Une fois débloqués, tu peux les retirer.</div>
     <button class="btn plein" id="btnOffres">▶ Gagner de l’argent</button>
     <button class="btn contour" id="btnRetrait">💸 Retirer mon argent</button>
     <button class="btn or" id="btnParrainer">👥 Inviter un ami</button>
@@ -108,7 +114,9 @@
   <!-- OFFRES -->
   <section class="ecran" id="ecran-offres">
     <div id="offresMsg" class="centre" style="display:none;padding:30px 10px"></div>
+    <div class="choix" id="offresReseaux"></div>
     <iframe id="cadre" title="Offres" allow="autoplay; fullscreen"></iframe>
+    <div class="aide centre" id="offresNote" style="display:none">Pas de sondage affiché ? Reviens dans quelques heures : les offres dépendent de ton profil.</div>
     <button class="lien" id="btnNouvellePage" style="display:none">Ouvrir dans une nouvelle page</button>
   </section>
 
@@ -126,8 +134,8 @@
     <label for="telRetrait">Numéro Mobile Money</label>
     <input id="telRetrait" type="tel" inputmode="tel" placeholder="Ex : 077 12 34 56">
     <label for="montant">Montant en FCFA</label>
-    <input id="montant" type="number" inputmode="numeric" placeholder="Ex : 1000">
-    <div class="aide">Minimum : <span id="minRetrait2">1000</span> FCFA</div>
+    <input id="montant" type="number" inputmode="numeric" placeholder="Ex : 5000">
+    <div class="aide">Minimum : <span id="minRetrait2">5000</span> FCFA</div>
     <button class="btn plein" id="btnEnvoyer" style="margin-top:22px">Envoyer ma demande</button>
   </section>
 
@@ -280,6 +288,9 @@ async function chargerAccueil() {
     profil = await appel('/api/me');
     $('#bonjour').textContent = profil.name;
     $('#solde').textContent = nf(Math.floor(Number(profil.balance_local_currency)));
+    const attente = Math.floor(Number(profil.balance_pending || 0));
+    $('#soldeAttente').textContent = nf(attente);
+    $('#blocAttente').style.display = attente > 0 ? 'block' : 'none';
     $('#minRetrait').textContent = nf(profil.min_payout);
     $('#codeParrain').textContent = profil.referral_code;
     chargerHistorique();
@@ -287,12 +298,21 @@ async function chargerAccueil() {
 }
 
 const ETATS = { pending: 'En attente', processing: 'En cours', paid: 'Payé', failed: 'Échoué (remboursé)' };
+const ETATS_GAIN = { pending: 'En attente', released: 'Disponible', reversed: 'Annulé' };
 async function chargerHistorique() {
   const box = $('#historique');
   try {
     const h = await appel('/api/history');
     const lignes = [
-      ...h.earnings.map((g) => ({ d: g.created_at, t: 'Gain offre', m: '+' + nf(g.amount_local) + ' FCFA', c: 'plus' })),
+      ...h.earnings.map((g) => {
+        const e = ETATS_GAIN[g.state] || '';
+        return {
+          d: g.created_at,
+          t: 'Gain offre' + (e ? ' · ' + e : ''),
+          m: '+' + nf(g.amount_local) + ' FCFA',
+          c: g.state === 'reversed' ? 'gris' : (g.state === 'pending' ? 'orange' : 'plus'),
+        };
+      }),
       ...h.payouts.map((p) => ({ d: p.created_at, t: 'Retrait ' + p.operator + ' · ' + (ETATS[p.status] || p.status), m: '−' + nf(p.amount) + ' FCFA', c: 'moins' })),
     ].sort((a, b) => new Date(b.d) - new Date(a.d)).slice(0, 20);
     box.innerHTML = '';
@@ -312,17 +332,33 @@ async function chargerHistorique() {
 $('#btnOffres').onclick = () => aller('offres');
 $('#btnRetrait').onclick = () => aller('retrait');
 
-// ---------- Offres ----------
+// ---------- Offres (un ou plusieurs murs) ----------
 let urlOffres = null;
 async function chargerOffres() {
   const msg = $('#offresMsg'), cadre = $('#cadre'), bouton = $('#btnNouvellePage');
-  msg.style.display = 'none'; cadre.style.display = 'block'; bouton.style.display = 'none';
+  const reseaux = $('#offresReseaux'), note = $('#offresNote');
+  msg.style.display = 'none'; cadre.style.display = 'block';
+  bouton.style.display = 'none'; note.style.display = 'none'; reseaux.innerHTML = '';
   try {
     chargement(true, 'Chargement des offres…');
     const r = await appel('/api/offerwall-url');
-    urlOffres = r.url;
-    cadre.src = urlOffres;
+    const murs = Array.isArray(r.walls) && r.walls.length ? r.walls : [{ name: 'Offres', url: r.url }];
+    const choisir = (i) => {
+      urlOffres = murs[i].url;
+      cadre.src = urlOffres;
+      [...reseaux.children].forEach((b, j) => b.classList.toggle('sel', j === i));
+    };
+    if (murs.length > 1) {
+      murs.forEach((m, i) => {
+        const b = document.createElement('button');
+        b.textContent = m.name;
+        b.onclick = () => choisir(i);
+        reseaux.append(b);
+      });
+    }
+    choisir(0);
     bouton.style.display = 'block';
+    note.style.display = 'block';
     chargement(false);
   } catch (e) {
     chargement(false);
@@ -351,7 +387,7 @@ $('#btnEnvoyer').onclick = async () => {
   const montant = parseInt($('#montant').value, 10);
   const tel = normaliserTel($('#telRetrait').value);
   if (!montant || montant < profil.min_payout) return toast('Montant minimum : ' + nf(profil.min_payout) + ' FCFA.', true);
-  if (montant > Math.floor(Number(profil.balance_local_currency))) return toast('Solde insuffisant.', true);
+  if (montant > Math.floor(Number(profil.balance_local_currency))) return toast('Solde disponible insuffisant.', true);
   if (tel.length < 11) return toast('Numéro Mobile Money invalide.', true);
   if (!confirm('Retirer ' + nf(montant) + ' FCFA vers le ' + tel + ' (' + (operateur === 'airtel' ? 'Airtel' : 'Moov') + ') ?')) return;
   try {
